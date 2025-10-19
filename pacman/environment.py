@@ -137,6 +137,10 @@ class PacmanEnvironment:
             "TR": (0, width - 1),
             "BL": (height - 1, 0),
             "BR": (height - 1, width - 1),
+            # "TL": (1, 1),
+            # "TR": (1, width - 2),
+            # "BL": (height - 2, 1),
+            # "BR": (height - 2, width - 2),
         }
 
         if exit_gate is None or pacman_start is None:
