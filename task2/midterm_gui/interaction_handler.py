@@ -19,7 +19,7 @@ class InteractionController:
 
     def on_click(self, pos: Tuple[int, int]):
         if self.session.is_busy():
-            self.ticker.show("Đang tính toán...", PALETTE["warning"], 30)
+            self.ticker.show("Solving...", PALETTE["warning"], 30)
             return
 
         action = self.controls.find_action(pos)
@@ -72,7 +72,7 @@ class InteractionController:
         self.pacman_direction = ACTION_TO_DIRECTION.get(action, self.pacman_direction)
 
         if self.session.at_goal():
-            self.ticker.show("Bạn đã tới đích!", PALETTE["success"], 80)
+            self.ticker.show("You are already at the goal!", PALETTE["success"], 80)
             return True
 
         moved = self.session.try_manual_step(action)
@@ -84,36 +84,34 @@ class InteractionController:
 
     def _toggle_auto(self):
         if not self.session.has_solution():
-            self.ticker.show("Hãy giải bài trước khi Auto!", PALETTE["warning"], 60)
+            self.ticker.show("Solve first before enabling Auto!", PALETTE["warning"], 60)
             return
         enabled = self.session.toggle_auto()
         self.ticker.show(
-            "Auto chạy" if enabled else "Auto dừng",
+            "Auto running" if enabled else "Auto stopped",
             PALETTE["accent"] if enabled else PALETTE["warning"],
             50,
         )
 
     def _step(self):
         if not self.session.has_solution():
-            self.ticker.show("Chưa có lời giải!", PALETTE["warning"], 60)
-            return
+            self.ticker.show("No solution yet!", PALETTE["warning"], 60)
+        return
         if self.session.at_goal():
-            self.ticker.show("Đã tới đích rồi.", PALETTE["success"], 60)
+            self.ticker.show("Already at the goal.", PALETTE["success"], 60)
             return
         if not self.session.step_once():
-            self.ticker.show("Không thực hiện được bước tiếp theo.", PALETTE["error"], 60)
+            self.ticker.show("Cannot execute the next step.", PALETTE["error"], 60)
 
     def _reset(self):
         self.session.reset()
         self.pacman_direction = "right"
-        self.ticker.show("Đã reset trạng thái.", PALETTE["text"], 40)
+        self.ticker.show("State reset.", PALETTE["text"], 40)
 
     def _toggle_manual(self):
         state = self.session.toggle_manual()
         self.ticker.show(
-            "Manual ON: dùng phím mũi tên"
-            if state
-            else "Manual OFF: quay về AI",
+            "Manual ON: use arrow keys" if state else "Manual OFF: back to AI",
             PALETTE["accent"] if state else PALETTE["text"],
             70,
         )
@@ -121,13 +119,13 @@ class InteractionController:
     def _teleport(self):
         result = self.session.teleport_manual()
         if result is None:
-            self.ticker.show("Không đứng ở ô teleport.", PALETTE["warning"], 60)
+            self.ticker.show("Not standing on a teleport tile.", PALETTE["warning"], 60)
         elif result is False:
-            self.ticker.show("Điểm teleport bị ma chắn.", PALETTE["error"], 60)
+            self.ticker.show("Teleport target blocked by a ghost.", PALETTE["error"], 60)
         else:
-            self.ticker.show(f"Dịch chuyển tới {result}", PALETTE["portal"], 80)
+            self.ticker.show(f"Teleported to {result}", PALETTE["portal"], 80)
             if self.session.at_goal():
-                self.ticker.show("Chiến thắng!", PALETTE["success"], 160)
+                self.ticker.show("Victory!", PALETTE["success"], 160)
 
     def _notify_invalid_move(self, action: str):
         layout = self.session.current_layout()
@@ -136,11 +134,11 @@ class InteractionController:
         target = (state.pacman_pos[0] + delta[0], state.pacman_pos[1] + delta[1])
 
         if not layout.in_bounds(target):
-            msg = "Vượt ngoài bản đồ!"
+            msg = "Out of bounds!"
         elif layout.is_wall(target) and state.pie_timer <= 0:
-            msg = "Đang đâm vào tường."
+            msg = "Blocked by a wall."
         elif any(g.position == target for g in state.ghosts):
-            msg = "Ma đang chắn đường."
+            msg = "A ghost is blocking the path."
         else:
-            msg = "Không thể di chuyển theo hướng đó."
+            msg = "Cannot move in that direction."
         self.ticker.show(msg, PALETTE["error"], 60)

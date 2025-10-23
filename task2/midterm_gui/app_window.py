@@ -9,7 +9,7 @@ from typing import Callable, Optional, Tuple
 import pygame
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from pacman.environment import PacmanEnvironment, PacmanProblem
+from pacman.environment import PacmanEnvironment, PacmanProblem, PacmanLayout
 from pacman.auto import run_auto_mode
 
 from .ui_style import HEURISTIC_CHOICES, PALETTE, SCREEN, TIMING
@@ -30,19 +30,19 @@ class ControlCallbacks:
 class PacmanGUI:
     def __init__(self, layout_path: Optional[Path] = None):
         pygame.init()
-        pygame.mixer.quit()  # giảm độ trễ khởi động do audio
+        pygame.mixer.quit() 
 
         self.layout_lines = self._load_layout(layout_path)
         self.environment = PacmanEnvironment(self.layout_lines)
         self.problem = PacmanProblem(self.environment)
-        self.environment.problem = self.problem  # Info panel cần truy cập
-
+        self.environment.problem = self.problem 
+        self._min_cell_size = 6
         self._configure_screen_geometry()
         self.screen = pygame.display.set_mode(
             (self.screen_width, self.screen_height),
             pygame.SCALED,
         )
-        pygame.display.set_caption("Pacman Mid-term – GUI & A* Demo")
+        pygame.display.set_caption("Pacman Mid-term - GUI & A*")
         self.clock = pygame.time.Clock()
 
         self.font = pygame.font.Font(None, max(22, self.cell_size // 2 + 6))
@@ -59,9 +59,9 @@ class PacmanGUI:
             self.board_left, self.board_top, self.board_width, self.board_height
         )
 
-        footer_top = self.screen_height - SCREEN.footer_height + SCREEN.board_padding
-        self.controls = ControlPanel(self.screen_width, self.board_left, self.board_width, footer_top)
-        info_top = footer_top + self.controls.button_height + 20
+        panel_anchor = self.panel_top
+        self.controls = ControlPanel(self.screen_width, self.board_left, self.board_width, panel_anchor)
+        info_top = self._compute_info_anchor(panel_anchor)
         self.info_panel = InfoPanel(self.controls.panel_left, self.controls.panel_width, info_top, self.info_font)
         self.ticker = MessageTicker()
 
@@ -80,7 +80,7 @@ class PacmanGUI:
             f"cell={self.cell_size}px"
         )
 
-    # ---------------------------------------------------------------- lifecycle
+    # lifecycle
     def run(self):
         running = True
         while running:
@@ -96,7 +96,7 @@ class PacmanGUI:
                         running = False
 
             if self.session.poll_solution():
-                self.ticker.show("Đã tìm thấy đường đi!", PALETTE["success"], 120)
+                self.ticker.show("Path found!", PALETTE["success"], 120)
 
             self.session.update_auto()
             self.session.advance_effects()
@@ -108,7 +108,7 @@ class PacmanGUI:
 
         pygame.quit()
 
-    # ---------------------------------------------------------------- callbacks
+    # callbacks
     def solve_puzzle(self):
         heuristic_key = HEURISTIC_CHOICES[self.heuristic_idx][1]
         label = HEURISTIC_CHOICES[self.heuristic_idx][0]
@@ -117,9 +117,9 @@ class PacmanGUI:
             return run_auto_mode(self.layout_lines, heuristic=selected)
 
         if self.session.request_solution(heuristic_key, solver):
-            self.ticker.show(f"Đang chạy A* ({label})", PALETTE["accent"], 120)
+            self.ticker.show(f"Running A* ({label})", PALETTE["accent"], 120)
         else:
-            self.ticker.show("Không thể giải lúc này.", PALETTE["warning"], 60)
+            self.ticker.show("Cannot solve right now.", PALETTE["warning"], 60)
 
     def cycle_heuristic(self):
         self.heuristic_idx = (self.heuristic_idx + 1) % len(HEURISTIC_CHOICES)
@@ -127,12 +127,18 @@ class PacmanGUI:
         self.session.reset()
         self.ticker.show(f"Heuristic: {HEURISTIC_CHOICES[self.heuristic_idx][0]}", PALETTE["text"], 90)
 
-    # ---------------------------------------------------------------- rendering
+    def _compute_info_anchor(self, base_anchor: int) -> int:
+        panel_bottom = self.panel_bottom
+        desired = base_anchor + self.controls.button_height + 20
+        max_anchor = max(self.panel_top, panel_bottom - self.info_font.get_linesize() * 4)
+        return max(self.panel_top, min(desired, max_anchor))
+
+    # rendering
     def _draw_frame(self):
         self.screen.fill(PALETTE["background"])
         self._draw_board()
 
-        anchor_y = self.screen_height - SCREEN.footer_height + SCREEN.board_padding
+        anchor_y = self.panel_top
         self.controls.update_layout(self.board_left, self.board_width, anchor_y)
         self.controls.show_active(
             auto=self.session.auto_running(),
@@ -142,7 +148,7 @@ class PacmanGUI:
         self.controls.render(self.screen, self.font)
         self.ticker.draw(self.screen, self.font, (int(self.screen_width * 0.01), int(self.screen_height * 0.01)))
 
-        info_anchor = anchor_y + self.controls.button_height + 20
+        info_anchor = self._compute_info_anchor(anchor_y)
         self.info_panel.update_layout(self.controls.panel_left, self.controls.panel_width, info_anchor)
         self.info_panel.draw(
             self.screen,
@@ -159,10 +165,14 @@ class PacmanGUI:
         state = self.session.current_state
         layout = self.environment.layouts[state.layout_index]
 
+        self._ensure_layout_scale(layout)
+
         grid_w = layout.width * self.cell_size
         grid_h = layout.height * self.cell_size
         board_left = max(SCREEN.board_padding, (self.screen_width - grid_w) // 2)
-        board_top = SCREEN.board_padding
+        board_area_top = self.board_area_top
+        board_area_height = self.usable_board_height
+        board_top = board_area_top + max(0, (board_area_height - grid_h) // 2)
 
         board_rect = pygame.Rect(board_left, board_top, grid_w, grid_h)
         pygame.draw.rect(self.screen, PALETTE["grid"], board_rect, border_radius=10)
@@ -299,7 +309,6 @@ class PacmanGUI:
                 self._missing_pacman_logged = True
             pygame.draw.circle(self.screen, PALETTE["accent"], pac_rect.center, self.cell_size // 2)
 
-    # ---------------------------------------------------------------- utilities
     def _load_layout(self, layout_path: Optional[Path]) -> list[str]:
         if layout_path and layout_path.exists():
             with open(layout_path, "r", encoding="utf-8") as fh:
@@ -314,29 +323,107 @@ class PacmanGUI:
 
     def _configure_screen_geometry(self):
         display = pygame.display.Info()
-        self.screen_width = min(display.current_w or SCREEN.max_width, SCREEN.max_width) * 0.8
-        self.screen_height = min(display.current_h or SCREEN.max_height, SCREEN.max_height) * 0.8
-
-        self.screen_width = int(self.screen_width)
-        self.screen_height = int(self.screen_height)
+        width_hint = display.current_w or SCREEN.max_width
+        height_hint = display.current_h or SCREEN.max_height
+        self.screen_width = int(min(width_hint, SCREEN.max_width) * 0.8)
+        self.screen_height = int(min(height_hint, SCREEN.max_height) * 0.8)
 
         max_w = max(layout.width for layout in self.environment.layouts)
         max_h = max(layout.height for layout in self.environment.layouts)
 
-        usable_w = self.screen_width - SCREEN.board_padding * 2
-        usable_h = self.screen_height - SCREEN.footer_height - SCREEN.board_padding * 2
-
-        cell_from_w = max(10, usable_w // max_w)
-        cell_from_h = max(10, usable_h // max_h)
-        self.cell_size = max(20, min(cell_from_w, cell_from_h))
+        self._update_screen_metrics()
+        self.cell_size = self._choose_cell_size(max_w, max_h)
         self.environment.cell_size = self.cell_size
 
         self.board_width = max_w * self.cell_size
         self.board_height = max_h * self.cell_size
         self.board_left = max(SCREEN.board_padding, (self.screen_width - self.board_width) // 2)
-        self.board_top = SCREEN.board_padding
+        self.board_top = self.board_area_top + max(0, (self.usable_board_height - self.board_height) // 2)
 
-    # --------------------------------------------------------------- diagnostics
+    def _update_screen_metrics(self) -> None:
+        self.usable_board_width = max(1, self.screen_width - SCREEN.board_padding * 2)
+
+        available_height = max(1, self.screen_height - SCREEN.board_padding * 3)
+        board_height = max(1, int(available_height * SCREEN.board_height_ratio))
+        panel_height = available_height - board_height
+
+        if panel_height < SCREEN.panel_min_height and available_height > SCREEN.panel_min_height:
+            panel_height = SCREEN.panel_min_height
+            if panel_height >= available_height:
+                panel_height = max(1, available_height - 1)
+            board_height = max(1, available_height - panel_height)
+        elif panel_height < 1:
+            panel_height = 1
+            board_height = max(1, available_height - panel_height)
+
+        self.usable_board_height = max(1, board_height)
+        self.panel_height = max(1, available_height - self.usable_board_height)
+        if self.panel_height < SCREEN.panel_min_height and available_height >= SCREEN.panel_min_height + 1:
+            self.panel_height = SCREEN.panel_min_height
+            self.usable_board_height = max(1, available_height - self.panel_height)
+
+        self.board_area_top = SCREEN.board_padding
+        self.panel_top = self.board_area_top + self.usable_board_height + SCREEN.board_padding
+        self.panel_bottom = self.panel_top + self.panel_height
+
+    def _choose_cell_size(self, cells_w: int, cells_h: int) -> int:
+        cells_w = max(1, cells_w)
+        cells_h = max(1, cells_h)
+        candidate_w = self.usable_board_width // cells_w
+        candidate_h = self.usable_board_height // cells_h
+        candidate = min(candidate_w, candidate_h)
+        if candidate <= 0:
+            candidate = 1
+        return candidate
+
+    def _ensure_layout_scale(self, layout: PacmanLayout) -> None:
+        if hasattr(self, "screen"):
+            current_w = self.screen.get_width()
+            current_h = self.screen.get_height()
+            if current_w != self.screen_width or current_h != self.screen_height:
+                self.screen_width = current_w
+                self.screen_height = current_h
+
+        self._update_screen_metrics()
+
+        target_cell = self._choose_cell_size(layout.width, layout.height)
+
+        preferred = max(target_cell, self._min_cell_size)
+        if (
+            preferred != target_cell
+            and layout.width * preferred <= self.usable_board_width
+            and layout.height * preferred <= self.usable_board_height
+        ):
+            target_cell = preferred
+
+        while target_cell > 1 and (
+            layout.width * target_cell > self.usable_board_width
+            or layout.height * target_cell > self.usable_board_height
+        ):
+            target_cell -= 1
+
+        if target_cell <= 0:
+            target_cell = 1
+
+        if target_cell != self.cell_size:
+            self._apply_cell_size(target_cell)
+
+    def _apply_cell_size(self, new_size: int) -> None:
+        new_size = max(1, new_size)
+        if new_size == self.cell_size:
+            return
+
+        self.cell_size = new_size
+        self.environment.cell_size = new_size
+
+        if hasattr(self, "sprites"):
+            self.sprites = ImageManager(self.cell_size)
+
+        self.font = pygame.font.Font(None, max(22, self.cell_size // 2 + 6))
+        self.info_font = pygame.font.Font(None, max(18, self.cell_size // 2))
+        if hasattr(self, "info_panel"):
+            self.info_panel.font = self.info_font
+
     def get_state_debug(self) -> dict:
         return {
             "heuristic": HEURISTIC_CHOICES[self.heuristic_idx][1],
@@ -348,7 +435,7 @@ class PacmanGUI:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--layout", type=Path, help="Đường dẫn file layout tùy chọn")
+    parser.add_argument("--layout", type=Path, help="Optional layout file path")
     args = parser.parse_args()
 
     gui = PacmanGUI(args.layout)

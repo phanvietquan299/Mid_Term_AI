@@ -8,8 +8,6 @@ from .ui_style import ACTION_DELTAS, TIMING
 
 
 class SessionState:
-    """Keeps track of gameplay state, auto-play and asynchronous solving."""
-
     def __init__(self, environment, problem, initial_state):
         self.env = environment
         self.problem = problem
@@ -40,7 +38,7 @@ class SessionState:
             "current_step": 0,
         }
 
-    # -------------------------------------------------------------------- flags
+    # flags
     @property
     def manual_mode(self) -> bool:
         return self._manual_enabled
@@ -63,7 +61,6 @@ class SessionState:
     def is_game_over(self) -> bool:
         return self.game_over_timer > 0
 
-    # ------------------------------------------------------------------- helpers
     def current_layout(self):
         return self.env.layouts[self.current_state.layout_index]
 
@@ -89,7 +86,6 @@ class SessionState:
             "current_step": 0,
         }
 
-    # -------------------------------------------------------------- async solve
     def request_solution(self, heuristic_name: str, solver_factory):
         if self._computing or self._manual_enabled:
             return False
@@ -142,7 +138,7 @@ class SessionState:
         }
         return False
 
-    # --------------------------------------------------------------- auto play
+    # auto play
     def toggle_auto(self) -> bool:
         if not self.has_solution() or self._manual_enabled or self.at_goal():
             return False
@@ -171,7 +167,7 @@ class SessionState:
             if not self._apply_action(self._path[self._path_index]):
                 self._auto_enabled = False
 
-    # --------------------------------------------------------------- manual play
+    # manual play
     def toggle_manual(self) -> bool:
         self._manual_enabled = not self._manual_enabled
         if self._manual_enabled:
@@ -233,7 +229,6 @@ class SessionState:
             return target_name
         return False
 
-    # ----------------------------------------------------------------- visuals
     def advance_effects(self):
         if self.current_state.layout_index != self._last_layout:
             self.rotation_flash = TIMING.rotation_flash
@@ -252,7 +247,6 @@ class SessionState:
             if self.game_over_timer == 0:
                 self.reset()
 
-    # ---------------------------------------------------------------- private
     def _apply_action(self, action):
         layout = self.current_layout()
         success = False

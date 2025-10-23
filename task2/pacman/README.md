@@ -40,7 +40,7 @@ puzzle/
   - `pacman_pos`: vị trí Pacman.
   - `food`, `pies`: `frozenset[Point]` – các ô chưa ăn.
   - `ghosts`: tuple `GhostState`.
-  - `pie_timer`: số bước xuyên tường còn lại (5 sau khi ăn pie).
+  - `pie_timer`: số bước xuyên tường còn lại (8 sau khi ăn pie).
   - `time_step`: tổng số bước đã đi (để kích hoạt quay).
   - `layout_index`: 0–3, dùng layout quay tương ứng.
 * `PacmanLayout`:
@@ -69,7 +69,7 @@ puzzle/
   2. Nếu Pacman đang ở góc (`corner_name` khác `None`), thử teleport tới các góc khác qua `_apply_teleport`.
 * `_apply_move(state, layout, move_name, delta)`:
   - Tính vị trí mới, kiểm tra biên và tường; chỉ cho xuyên tường khi `pie_timer > 0`.
-  - Không cho bước vào ô đang có ma; nếu ăn pie thì `pie_timer = 5`.
+  - Không cho bước vào ô đang có ma; nếu ăn pie thì `pie_timer = 8`.
   - Cập nhật `food`/`pies` (xoá ô đã ăn).
   - Ma di chuyển ngang bằng `_move_ghost`. Nếu ma mới đè lên Pacman → bỏ trạng thái.
   - Giảm `pie_timer` (trừ khi hành động `Stay`), tăng `time_step`.

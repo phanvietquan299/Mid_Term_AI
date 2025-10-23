@@ -1,5 +1,3 @@
-"""CLI entry point for Pacman Task 2.1 automatic mode."""
-
 from __future__ import annotations
 
 import argparse

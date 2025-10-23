@@ -13,6 +13,11 @@ class ScreenPlan:
     max_height: int = 1080
     footer_height: int = 180
     board_padding: int = 12
+    control_panel_min_pct: float = 0.42
+    control_panel_max_pct: float = 0.68
+    board_height_ratio: float = 0.8
+    panel_height_ratio: float = 0.2
+    panel_min_height: int = 100
 
 
 @dataclass(frozen=True)

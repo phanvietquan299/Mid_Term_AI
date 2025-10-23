@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -67,30 +68,56 @@ class ControlPanel:
     def _layout_buttons(self, board_left: int, board_width: int, anchor_y: int) -> None:
         top_buttons = self.buttons[:-1]
         count = len(top_buttons)
-        available_width = self.screen_width - SCREEN.board_padding * 2
-        panel_width = min(available_width, max(board_width, 560))
-        panel_left = max(SCREEN.board_padding, (self.screen_width - panel_width) // 2) - int(self.screen_width * 0.1)
-        
-        spacing_dynamic = max(self.spacing, int(panel_width * 0.01))
-        spacing_total = spacing_dynamic * (count - 1)
-        width = max(88, (panel_width - spacing_total) // count)
 
-        panel_right = self.screen_width - SCREEN.board_padding
-        
+        available_width = max(1, self.screen_width - SCREEN.board_padding * 2)
+        max_panel = max(1, int(self.screen_width * SCREEN.control_panel_max_pct))
+        min_panel = max(1, int(self.screen_width * SCREEN.control_panel_min_pct))
+        panel_width = min(available_width, max_panel)
+        panel_width = max(panel_width, min(min_panel, available_width))
+        panel_left = max(SCREEN.board_padding, (self.screen_width - panel_width) // 2)
+        panel_right = panel_left + panel_width
+
+        spacing_dynamic = max(self.spacing, int(panel_width * 0.02)) if count else self.spacing
+        gaps = count if count > 0 else 0
+        total_spacing = spacing_dynamic * gaps
+        core_width = max(1, panel_width - total_spacing)
+
+        heur_min = max(int(panel_width * 0.18), 120)
+        heur_max = max(heur_min, int(panel_width * 0.4))
+
+        if count > 0:
+            remaining_for_buttons = max(1, core_width - heur_min)
+            btn_min = max(1, int(panel_width * 0.07))
+            btn_target = max(btn_min, int(panel_width * 0.12))
+            btn_max = max(btn_target, int(panel_width * 0.18))
+
+            width = min(btn_max, max(btn_min, min(btn_target, remaining_for_buttons // count)))
+            heur_width = core_width - width * count
+            if heur_width < heur_min:
+                deficit = heur_min - heur_width
+                reduction = math.ceil(deficit / count)
+                width = max(btn_min, width - reduction)
+                heur_width = core_width - width * count
+            heur_width = max(heur_min, min(heur_max, heur_width))
+        else:
+            width = 0
+            heur_width = max(heur_min, min(heur_max, core_width))
+
         x = panel_left
-        
-        for idx, btn in enumerate(top_buttons):
+        for btn in top_buttons:
             btn.rect = pygame.Rect(int(x), anchor_y, int(width), self.button_height)
-            x = btn.rect.right + (spacing_dynamic if idx < count - 1 else 0)
+            x += width + spacing_dynamic
 
         if self._heuristic_button:
-            heur_left = x + (self.spacing if count else 0)
-            min_width = max(width, 140)
+            heur_left = x if count else panel_left
             heur_right_limit = panel_right
-            if heur_left + min_width > heur_right_limit:
-                heur_left = max(panel_left, heur_right_limit - min_width)
-            heur_width = min(max(int(width * 1.6), min_width), heur_right_limit - heur_left)
-            self._heuristic_button.rect = pygame.Rect(int(heur_left), anchor_y, int(heur_width), self.button_height)
+            heur_width = min(heur_width, max(heur_min, heur_right_limit - heur_left))
+            self._heuristic_button.rect = pygame.Rect(
+                int(heur_left),
+                anchor_y,
+                int(max(heur_min, heur_width)),
+                self.button_height,
+            )
 
         self.panel_left = panel_left
         self.panel_width = panel_width
@@ -104,7 +131,7 @@ class ControlPanel:
     def _heuristic_label(self, idx: int) -> str:
         return f"H: {HEURISTIC_CHOICES[idx][0]}"
 
-    # ----------------------------------------------------------------- drawing
+    # drawing
     def render(self, screen: pygame.Surface, font: pygame.font.Font):
         for btn in self.buttons:
             self._draw_button(screen, font, btn)
@@ -128,7 +155,7 @@ class ControlPanel:
         label = font.render(btn.label, True, PALETTE["background"])
         screen.blit(label, label.get_rect(center=btn.rect.center))
 
-    # ------------------------------------------------------------------ events
+    # events
     def find_action(self, pos: Tuple[int, int]) -> Optional[str]:
         for btn in self.buttons:
             if btn.rect.collidepoint(pos):
